@@ -1,9 +1,15 @@
 ---
 - hosts: [ehour]
-  
+  remote_user: ubuntu
+  become: yes
+  vars:
+    MySQL_root_pass: Zapcom99
+
   tasks: 
+   
+   
     - name: installing base package
-      apt: name={{ item }} state==present
+      apt: name={{ item }} state=present
       with_items:
         - default-jre
         - default-jdk
@@ -13,7 +19,60 @@
         - mysql-common
         - python-mysqldb
     - name: service starting
-      service: name={{item}} state=started enable=true
+      service: name={{ item }} state=started #enable=true
       with_items:
-        - tomcat7
         - mysql
+      #  - tomcat7
+      #notify: restart tomcat7
+
+    - name: get the installing file and uncompressing
+      unarchive: src=http://www.ehour.nl/download/downloadfile.php?get=ehour-1.4.4-SNAPSHOT-war.zip dest=/tmp/ remote_src=yes
+    - unarchive: src=http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-5.0.8.tar.gz dest=/usr/share/tomcat7/bin/ remote_src=yes
+
+    - name: creating mysql database
+      mysql_db: name=ehour state=present login_user=root login_password="Zapcom99"
+
+    - name: importing from the dump file 
+      mysql_db: state=import name=ehour target=/tmp/ehour-1.4.4-SNAPSHOT/sql/mysql/install/fresh.mysql.sql
+
+    - name: copy /tmp/ehour to /opt/ehour
+      #shell: "cp -rf /tmp/ehour-1.4.4-SNAPSHOT/ /opt/ && mv /opt/ehour-1.4.4-SNAPSHOT/ /opt/ehour"
+      command: mv /tmp/ehour-1.4.4-SNAPSHOT/ /opt/ehour
+
+    - name: creating a log file for ehour
+      file: path=/opt/ehour/log/ehour.log state=touch owner=tomcat7 group=tomcat7 mode="u=rw,g=rw,o=r"
+
+    - file: path=/opt/ehour owner=tomcat7 group=tomcat7 mode=0755
+    
+    #- name: creating a log file for ehour
+     # file: path=/opt/ehour/log/ehour.log state=touch mode="u=rw,g=rw,o=r"
+      #copy: src=/tmp/ehour-1.4.4-SNAPSHOT/ dest=/opt/ehour/ owner=ubuntu group=ubuntu mode=0744
+    - name: copy the tomcat files
+      command: cp /opt/ehour/app/ehour-1.4.4-SNAPSHOT.war /var/lib/tomcat7/webapps/ehour.war
+
+    - name: copying the ehour database property filehttps://s3.amazonaws.com/lincy-ehour/ehour.properties 
+      fetch: src=https://s3.amazonaws.com/lincy-ehour/ehour.properties dest=/opt/ehour/conf/ehour.properties
+    
+    - name: setting env variable 
+    #  command: echo "export EHOUR_HOME=/opt/ehour" >> /usr/share/tomcat7/bin/setenv.sh
+      #  lineinfile: dest=/usr/share/tomcat7/bin/setenv.sh state=present line='export EHOUR_HOME=/opt/ehour'
+      file: path=/usr/share/tomcat7/bin/setenv.sh state=touch mode="0755"
+    -  lineinfile: dest=/usr/share/tomcat7/bin/setenv.sh line="export EHOUR_HOME=/opt/ehour/"
+
+    - name: changing the config 
+      file: path=/usr/share/tomcat7/bin/setenv.sh mode=0755
+
+    - name: service starting
+      service: name={{ item }} state=started #enable=true
+      with_items:
+        - mysql
+        - tomcat7
+      notify: restart tomcat7
+  
+  handlers:
+    - name: restart tomcat7
+      service: name={{ item }} state=restarted
+      with_items:
+         - tomcat7
+         - mysql
+
