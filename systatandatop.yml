@@ -1,0 +1,18 @@
+---
+- hosts: [test]
+  become: true
+  
+  tasks:
+    - name: installing on redhat
+      yum: name={{ item }} state=present
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' or ansible_distribution == 'Amazon Linux'
+      with_items:
+          - atop
+          - sysstat
+
+    - name: install on ubuntu
+      apt: name={{ item }} state=present 
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+      with_items:
+          - atop
+          - sysstat 
