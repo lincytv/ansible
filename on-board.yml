@@ -1,0 +1,48 @@
+---
+- hosts: [rean]
+  remote_user: ubuntu
+  become: true
+  become_user: root
+  vars: 
+     stackdriver: SLJY0XYQMF9Y4XWOVDJ9ZPS1L5LJDXVW
+     tag_stackdriver: stackdiver_monitor
+     tag_value_stackdriver: true
+     tag_cmp_name: gig_backup
+     tag_cmp_value: 3D2W1M
+     instance_id: i-0d3a8d429296d7772
+
+  tasks:
+    - name: adding the repo of stack driver
+      shell: 'curl -o /etc/apt/sources.list.d/stackdriver.list https://repo.stackdriver.com/trusty.list'
+    
+    - name: adding gpg key for stackdriver  
+      shell: 'curl --silent https://app.stackdriver.com/RPM-GPG-KEY-stackdriver |apt-key add -'
+   
+    - name: check for the update
+      apt: update_cache=yes
+
+    - name: installing stackdriver agent 
+      apt: name=stackdriver-agent state=latest
+
+    - name: adding the stackdriver api key
+      shell: /opt/stackdriver/stack-config --api-key {{ stackdriver }}
+    - name: starting the service
+      service: name=stackdriver-agent state=started
+
+    - name: Make sure stackdriver-extractor is started state
+      service: name=stackdriver-extractor state=started
+
+    - name: creating a user reanro
+      user: name=reanro password=reanro
+
+    - name: making common reanro user
+      file: path=/home/reanro/.ssh state=directory owner=reanro group=reanro mode=0700
+
+    - file: path=/home/reanro/.ssh/authorized_keys state=touch owner=reanro group=reanro mode=0600
+    - copy: src=reanro-generic-pub dest=/home/reanro/.ssh/authorized_keys
+
+    - name: Trend Micro Agent Downloading.
+      get_url: url='wget https://deepsecurity.reancloud.com:443/software/agent/Ubuntu_14.04/x86_64/ -O /tmp/agent.deb --no-check-certificate --quiet' dest=/tmp
+    
+    - name: Trend Micro Agent installing agent
+      command: 'dpkg -i /tmp/agent.deb'
